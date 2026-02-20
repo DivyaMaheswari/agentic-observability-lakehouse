@@ -1,3 +1,4 @@
 delta_tables/
 __pycache__/
+.idea/
 .env
