@@ -10,33 +10,59 @@ services:
     ports:
       - "5432:5432"
 
-  airflow:
+  airflow-webserver:
     image: apache/airflow:2.7.2
-    container_name: airflow
+    container_name: airflow-webserver
     depends_on:
       - postgres
     ports:
       - "8081:8080"
     volumes:
       - ./dags:/opt/airflow/dags
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
-      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__WEBSERVER__SECRET_KEY: my_super_secret_key
+      DOCKER_API_VERSION: 1.44
     command: >
       bash -c "
       airflow db migrate &&
-      airflow users create --username admin --password admin --firstname admin --lastname user --role Admin --email admin@example.com || true &&
+      airflow users create \
+      --username admin \
+      --password admin \
+      --firstname admin \
+      --lastname user \
+      --role Admin \
+      --email admin@example.com || true &&
       airflow webserver
       "
+
+  airflow-scheduler:
+    image: apache/airflow:2.7.2
+    container_name: airflow-scheduler
+    depends_on:
+      - airflow-webserver
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__WEBSERVER__SECRET_KEY: my_super_secret_key
+      DOCKER_API_VERSION: 1.44
+    command: scheduler
+
   spark:
     image: apache/spark:3.5.1
     container_name: spark
     command: >
       /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
     ports:
-      - "8080:8080"
       - "7077:7077"
+      - "8080:8080"
     volumes:
       - ./spark_jobs:/opt/spark_jobs
       - ./data:/opt/data
